@@ -171,8 +171,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: localhost:5000/worker:latest
-          format: sarif
-          output: trivy-worker.sarif
+          format: table
           severity: CRITICAL
           exit-code: "1"
 
