@@ -254,20 +254,20 @@ jobs:
 
       - name: Rolling update
         run: |
-          docker compose pull || true
-          docker compose up --build -d --no-deps --scale api=2 api
+          docker compose up --build -d
           
           echo "Waiting for new api container to be healthy..."
           for i in $(seq 1 12); do
-            if curl -sf http://localhost:8000/health; then
-              echo "New container is healthy"
-              docker compose up -d --no-deps --scale api=1 api
+            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' hng14-stage2-devops-api-1 2>/dev/null || echo "unknown")
+            echo "API health: $HEALTH"
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "Deploy successful - containers are healthy"
               exit 0
             fi
-            echo "Attempt $i/12..."
             sleep 5
           done
 
-          echo "Health check failed — aborting deploy, old container left running"
-          docker compose up -d --no-deps --scale api=1 api
+          echo "Health check failed - aborting deploy"
+          docker compose down
           exit 1
+
