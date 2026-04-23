@@ -1,18 +1,16 @@
 # syntax=docker/dockerfile:1
 
-# ── Stage 1: builder ──────────────────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /build
 
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:20-alpine AS runtime
 
-RUN groupadd --gid 1001 appgroup && \
-    useradd --uid 1001 --gid appgroup --shell /bin/sh --create-home appuser
+RUN addgroup -g 1001 appgroup && \
+    adduser -u 1001 -G appgroup -s /bin/sh -D appuser
 
 WORKDIR /app
 
