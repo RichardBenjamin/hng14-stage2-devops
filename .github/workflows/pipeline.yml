@@ -249,35 +249,29 @@ jobs:
 
       - name: Create .env file
         run: |
-          echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+          echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" > .env
           echo "QUEUE_KEY=jobs" >> .env
 
       - name: Rolling update
         run: |
           docker compose up --build -d
 
-          echo "Waiting for containers to be healthy..."
-          sleep 30
-
-          echo "Container status:"
-          docker ps -a
-
-          echo "Checking API health..."
+          echo "Waiting for services to be healthy..."
           for i in $(seq 1 12); do
-            if curl -sf http://localhost:8000/health 2>/dev/null; then
-              echo "Deploy successful"
+            REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' hng14-stage2-devops-redis-1 2>/dev/null || echo "unknown")
+            API_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' hng14-stage2-devops-api-1 2>/dev/null || echo "unknown")
+            echo "Attempt $i/12 — Redis: $REDIS_HEALTH | API: $API_HEALTH"
+
+            if [ "$API_HEALTH" = "healthy" ]; then
+              echo "Deploy successful — all containers healthy"
               exit 0
-            fi
-            CONTAINER=$(docker ps --filter "name=api" --format "{{.Names}}" | head -1)
-            if [ -n "$CONTAINER" ]; then
-              HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
-              echo "Attempt $i/12 - API container: $CONTAINER health: $HEALTH"
-            else
-              echo "Attempt $i/12 - no API container found"
             fi
             sleep 5
           done
 
-          echo "Health check failed - aborting deploy"
-          docker compose down
+          echo "Health check did not pass within 60s — aborting, leaving old containers running"
           exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
